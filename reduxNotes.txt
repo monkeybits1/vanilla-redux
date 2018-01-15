@@ -1,0 +1,257 @@
+Coding Circle: Redux 1/2018 (JJ)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ¡¡¡¡ FLUX !!!!
+   -Facebook introduced `Flux` to solve a problem/re-occuring bug they were experiencing (ie: notifications)
+
+   `They had models which held the data and would pass data to the view layer to render the data.
+    Because user interaction happened through the views, the views sometimes needed to update models based on user input.
+    And sometimes models needed to update other models.`
+
+  -The solution was uni-directional data flow. `flux === flow`
+      Flux pattern : [user interaction] >>> action --> dispatcher --> store --> view
+        *on ui interaction we start back at the beginning
+
+  -The cast of characters in the flux show
+    1. action creator (the telegraph operator)
+      It is in charge of creating actions, which is the path that all changes and interactions should go thru.
+      Whenever you want to change the state of the app or have the view render differently, you `fire` an action.
+      You go to the action creator knowing basically what message you want to send, and then the action creator formats that in a way
+      that the rest of the system can understand.
+
+      The action creator creates an action with a type and a payload, maybe something like ... `{ type: '', payload: {} }`
+      The type will be one of the types that you have already defined as an action in your system ( this is usually a list of constants ).
+
+      ** Let's think about how powerful this alone is **
+      A new developer can come on the project,
+      open up the action creator files and see the entire API — all of the possible state changes that your system provides.
+      Once it has created the action message, the action creator passes that action off to the dispatcher.
+
+    2. dispatcher (the telephone operator)
+      Is basically a big registry of callbacks. It keeps a list of all of the store(s) that it needs to send actions to.
+      The action is sent to all of the registered stores regardless of what the action type is.
+      This means the store doesn’t just subscribe to some actions. It hears about all actions and filters out what it cares about and doesn’t.
+
+    3. store (the bureaucrat)
+      Holds on to all state in the application, and all of the state changing logic lives inside of the store(s).
+      All state changes must be made by it personally. And you can’t directly request that it change the state.
+      There are no setters on the store.
+      To request a state change, you must follow proper procedure… you must submit an action via the action creator/dispatcher pipeline.
+
+      Inside the store there’s usually a switch statement that looks at the action type to decide whether or not this store cares about this action.
+      If the store does care about this action, it will figure out what change needs to be made based on this action and update the state.
+
+      Once the store has made its changes to the state, it will emit a change event. This will notify the controller view that the state has changed.
+
+    4. controller view & view (the presenter)
+      The views are in charge of taking the state and rendering it out for the user as well as accepting user input.
+      * It isn’t aware of anything in the application *
+      It just knows the data that’s handed to it and how to format the data into output that people understand (via HTML).
+
+      The controller view is like a middle manager between the store and the view.
+      The store tells it when the state has changed.
+      It collects the new state and then passes the updated state along to all of the views under it.
+
+    Flux setup on initialization:
+      1. Store(s) let the dispatcher know that they want to be notified whenever an action comes in.
+      2. Then the controller views ask the stores for the latest state.
+      3. When the store(s) give the state to the controller views, they pass that state along to their child views to render.
+      4. The controller views also ask the stores to keep them notified when state changes.
+
+    Flux data flow:
+      1. user action -- The view tells the action creator to prepare an action.
+      2. The action creator formats the action and sends it off to the dispatcher.
+      3. The dispatcher sends the action off to the store(s) in sequence.
+      ** Each store gets notified of all actions. Then the store decides whether it cares about this one or not, and changes the state accordingly.
+      4. Once it’s done changing state, the store lets its subscribed view controllers know.
+      5. Those view controllers will then ask the store to give them the updated state.
+      6. After the store gives it the state, the view controller will tell its child views to re-render based on the new state.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ¡¡¡¡ REDUX !!!!
+    -Redux creator Dan Abramov saw an opportunity to improve on Flux.
+    -wanted better developer tools ( ie: time-travel debugging & hot-reloading ). But, there are some problems with Flux which make these things hard.
+
+    *Flux Problems*
+      Problem 1: The code for store(s) can’t be reloaded without wiping out the state.
+        In Flux, the store contains two things:
+          -the state change logic
+          -the current state itself
+
+        *** Having these two on the same object is a problem for hot-reloading.
+          When you reload the store object to see the effect that the new state change logic has, you lose the state that the store is holding on to.
+          Plus, you mess up the event subscriptions that tie the store to the rest of the system. ***
+
+        Solution:
+          Separate these two functions.
+          Have one object that holds on to the state. This object doesn’t get reloaded.
+          Have another object that contains all of the state change logic.
+          This object can be reloaded because it doesn’t have to worry about holding on to any state.
+
+      Problem 2: The state is being rewritten with every action.
+        In time travel debugging, you keep track of each version of a state object. That way, you can go back to an earlier state.
+        Each time the state is changed, you need to add the old state to an array of previous state objects.
+        But because of the way JavaScript works, simply adding the variable to the array won’t work.
+        This doesn’t create a snapshot of the object, it just creates a new pointer to the same object.
+
+        To make it work, each version needs to be an entirely separate object so that you aren’t accidentally changing past versions.
+
+        Solution:
+          When an action comes in to the store, don’t handle it by changing the state. Instead, copy the state and make changes to the copy.
+
+
+      Problem 3: There aren’t good places for third-party plugins to jump in.
+        When you’re making developer tools, you need to be able to write them generically.
+        A user should be able to just drop the tool in without having to custom fit their own code around it.
+        For this to work, you need extension points… places where the code expects to have things added to it.
+
+        An example: Logging.
+          Let’s say you want to console.log() every action as it comes in, and then console.log() the state that results from it.
+          In Flux, you’d have to subscribe to the dispatcher’s updates and to updates from each store.
+          But that’s custom code, not something a third-party module can easily do.
+
+        Solution:
+          Make it easy to wrap parts of the system in other objects.
+          These other objects add their bit of functionality on top of the original.
+          You can see these kinds of extension points in things like “enhancers” or “higher order” objects, as well as middleware.
+
+          In addition, use a tree to structure the state change logic.
+          This makes it so the store only emits one event to notify the views that the state has changed.
+          This event comes after the whole state tree has been processed.
+
+    redux pattern : [user interaction] >>> Action --> Dispatch --> Reducer: (New State) --> Store --> View !
+
+    -The cast of characters in the redux show:
+      1. action creator (the telegraph operator)
+        Redux keeps the action creator from Flux.
+        Whenever you want to change the state of the application, you shoot off an action.
+        That’s the only way that the state should be changed.
+        * Unlike Flux, action creators in Redux do not send the action to the dispatcher. Instead, they return a formatted action object.
+
+      2. store (the bureaucrat)
+        The store in Redux is still controlling and bureaucratic, but it’s a little bit different.
+
+        In Flux, you can have multiple stores.
+        Each store has its own little fiefdom, and it is in total control.
+        It holds on to its little slice of state, and has all the logic for changing that little slice of state.
+
+        The Redux store tends to delegate more. And it has to.
+        In Redux, there is only one store… so if it did everything itself, it would be taking on too much work.
+
+        Instead, it takes care of holding on to the whole state tree.
+        It then delegates the work of figuring out what state changes need to happen.
+        The reducers, headed up by the root reducer, take on this task.
+
+        You might have noticed there’s no dispatcher. That’s because, the store has taken over dispatching.
+
+      3. reducers (workers who are a bit overzealous about photocopying)
+        When the store needs to know how an action changes the state, it asks the reducers.
+        The root reducer takes charge and slices the state up based on the state object’s keys.
+        It passes each slice of state to the reducer that knows how to handle it.
+
+        They don’t want to mess anything up, so they don’t change the state that has been passed in to them.
+        Instead, they make a copy and make all their changes on the copy.
+
+        They pass their copies back to the root reducer, which pastes the copies together to form the updated state object.
+        Then the root reducer sends the new state object back to the store, and the store makes it the new official state.
+
+        If you have a small application, you might only have one reducer making a copy of the whole state object and making its changes.
+        Or if you have a large application, you might have a whole tree of reducers.
+
+      4. controller view & view (the presenter) but, two types -->  smart (middle-managers) and dumb components
+        Smart components manage the communication between the store and their child views.
+
+        Smart components are in charge of the actions.
+        If a dumb component underneath them needs to trigger an action, the smart component passes a function in via the props.
+        The dumb component can then just treat that as a callback.
+
+        Smart components do not have their own CSS styles.
+
+        Smart components rarely emit DOM of their own.
+        Instead, they arrange dumb components, which handle laying out DOM elements.
+
+        Dumb components don’t depend on action files directly, since all actions are passed in via props.
+        This means that the dumb component can be reused in a different app that has different logic.
+
+        They also contain the styles that they need to look reasonably good,
+        though you can allow for custom styling — just accept a style prop and merge it in to the default styles.
+
+      5. the view-layer binding (IT department for the view tree) -- libarary/framework dependent ( react v. angular)
+        It makes sure that all of the components can connect to the store.
+        It also takes care of a lot of technical details so that the rest of the hierarchy doesn’t have to understand them.
+
+        The view layer binding introduces three concepts:
+          1. The Provider component: This is wrapped around the component tree.
+          It makes it easy for the root component’s children to hook up to the store using connect().
+
+          2. connect(): This is a function provided by react-redux.
+          If a component wants to get state updates, it wraps itself using connect().
+          Then the connect function will set up all the wiring for it, using the selector.
+
+          3. selector: This is a function that you write. It specifies what parts of the state a component needs as properties.
+
+      6. root component (executive)
+        Puts all of the teams in place to tackle the work.
+        It creates the store, telling it what reducer to use, and brings together the view layer binding and the views.
+        The root component is pretty hands-off after it initializes the app.
+        It doesn’t get caught up in the day-to-day concerns of triggering rerenders.
+        It leaves that to the components below it, assisted by the view layer binding.
+
+    Redux setup on initialization:
+      1. Get the store ready. The root component creates the store, telling it what root reducer to use.
+        This root reducer already has a team of reducers which report to it.
+        So it assembles that team of reducers.
+
+      2. Set up the communication between the store and the components.
+
+      3. Prepare the action callbacks.
+        To make it easier for dumb components to work with actions, the smart components can setup action callbacks.
+        This way, they can just pass down a callback to the dumb component.
+        The action will be automatically dispatched after it is formatted.
+
+    Redux data flow:
+      1. The view requests an action. The action creator formats it and returns it.
+      2. The action is either dispatched automatically or the view dispatches the action.
+      3. The store receives the action. It sends the current state tree and the action to the root reducer.
+      4. The root reducer cuts apart the state tree into slices. Then it passes each slice to the subreducer that knows how to deal with it.
+      5. The subreducer copies the slice and makes changes to the copy. It returns the copy of the slice to the root reducer.
+      6. Once all of the subreducers have returned their slice copies,
+      the root reducer pastes all of them together to form the whole updated state tree, which it returns to the store.
+      The store replaces the old state tree with the new one.
+      7. The store tells the view layer binding that there’s new state.
+      8. The view layer binding asks the store to send over the new state.
+      9. The view layer binding triggers a rerender.
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  SUMMARY:
+    Core Concepts:
+      1. STORE
+          -Store promotes the idea of one-way data flow and explicitly dispatched actions
+          -Each application is built around a store and will contain three main pieces, reducers, actions, and a single application store. 
+          -Your store can be thought of as a client side ‘single source of truth’, or database
+          -A snapshot of the store at any point will supply a complete representation of relevant application state.
+          ** This becomes extremely powerful when it comes to reasoning about user-interaction, debugging
+
+      2. REDUCERS
+          -A `pure` function, accepting two arguments, the previous state and an action with a type and optional data (payload) associated with the event
+          ** What is a `pure` function?  A function whose return value is determined only by its input values, with no observable side-effects.
+          -Reducers can be considered the tables/collection in your clientside database. Reducers represent sections,
+          or slices of state within your application and should be structured and composed accordingly
+
+      3. ACTIONS
+          -All user interaction that would cause a state update must be expressed in the form of actions
+
+      ADVANTAGES
+        1. centralized immutable state
+        2. performance
+        3. testability
+        4. tooling/ecosystem
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~REDUX CODING DEMO WALKTHRU~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  1. Store Creation and Initial State
+  2. Dispatching Actions
+  3. Reducers
+  4. Store Subscription
+  5. Actions to Action Creators
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
